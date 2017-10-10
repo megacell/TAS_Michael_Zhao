@@ -9,7 +9,7 @@ import numpy as np
 from process_data import extract_features, process_links, geojson_link, \
     process_trips, process_net, process_node, array_to_trips, process_results
 from metrics import average_cost, cost_ratio, cost, save_metrics
-from frank_wolfe import solver, solver_2, solver_3
+from frank_wolfe_2 import solver, solver_2, solver_3
 from multi_types_solver import gauss_seidel
 from All_Or_Nothing import all_or_nothing
 from scripts_LA import load_LA
@@ -77,7 +77,7 @@ def Cython_Func_LA():
 
     demand[:,2] = 0.5*demand[:,2] / 4000
     #import pdb; pdb.set_trace()
-    f = solver_3(graph, demand, max_iter=1000)
+    f = solver(graph, demand, max_iter=30)
     #results = np.loadtxt('data/SiouxFalls_results.csv')
     np.savetxt('data/la/LA_Cython.csv', f, delimiter=',')
     #self.check(f*4000, results, 1e-3)

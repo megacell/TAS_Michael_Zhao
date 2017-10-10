@@ -7,13 +7,16 @@ all-or-nothing assignment using igraph
 
 import numpy as np
 import timeit
+from collections import defaultdict
 
 def all_or_nothing(g, od):
     '''
     We are given an igraph object 'g' with od in the format {from: ([to], [rate])}
     do all_or_nothing assignment 
     '''
+
     L = np.zeros(len(g.es), dtype="float64")
+    path_flows = defaultdict(np.float64)
 
     for o in od.keys():
 
@@ -24,5 +27,9 @@ def all_or_nothing(g, od):
                 # print 'no path between {} and {}'.format(o, od[o][0][i])
             L[inds] = L[inds] + od[o][1][i]
 
-    return L
+            path_flows[(o, od[o][0][i], tuple(inds))] += od[o][1][i]
+
+
+
+    return L, path_flows
 

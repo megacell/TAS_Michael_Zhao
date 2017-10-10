@@ -27,7 +27,7 @@ def search_direction_multi(f, graphs, gs, ods, L, grad):
         #start timer
     	start_time2 = timeit.default_timer()
 
-        l, gr = search_direction(np.sum(np.reshape(f,(types,links)).T,1), \
+        l, gr, path_flows = search_direction(np.sum(np.reshape(f,(types,links)).T,1), \
             graph, g, od)
 
     	#end of timer
