@@ -181,6 +181,7 @@ def fw_heterogeneous_2(graphs, demands, past=10, max_iter=100, eps=1e-8, q=50, \
         print 'average free-flow travel time', \
             K / sum([np.sum(demand[:,2]) for demand in demands])
     # compute iterations
+    start_time = timeit.default_timer()
     for i in range(max_iter):
         if display >= 1:
             if i <= 1:
@@ -252,7 +253,7 @@ def fw_heterogeneous_2(graphs, demands, past=10, max_iter=100, eps=1e-8, q=50, \
             flow = h[k]
             for link in k[2]:
                 f_h[link] += flow
-        print "path vs link flow diff:", np.sum(np.abs(f_h - f)), f.shape
+        print "path vs link flow diff:", np.sum(np.abs(f_h - np.sum(np.reshape(f,(types,links)).T,1))), f.shape
 
     # find how many paths each od pair really has
     od_paths = defaultdict(int)
@@ -341,7 +342,7 @@ def main():
     demand[:,2] = 0.5*demand[:,2] / 4000
     g_nr, small_capacity = multiply_cognitive_cost(graph, features, thres, cog_cost)
     d_nr, d_r = heterogeneous_demand(demand, alpha)
-    fs = fw_heterogeneous_1([g_nr,graph], [d_nr,d_r], max_iter=1000, display=1)
+    fs = fw_heterogeneous_2([g_nr,graph], [d_nr,d_r], max_iter=1000, display=1)
 
     #end of timer
     elapsed2 = timeit.default_timer() - start_time2;
