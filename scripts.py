@@ -77,7 +77,7 @@ def Cython_Func_LA():
 
     demand[:,2] = 0.5*demand[:,2] / 4000
     #import pdb; pdb.set_trace()
-    f = solver(graph, demand, max_iter=30)
+    f = solver_3(graph, demand, max_iter=30)
     #results = np.loadtxt('data/SiouxFalls_results.csv')
     np.savetxt('data/la/LA_Cython.csv', f, delimiter=',')
     #self.check(f*4000, results, 1e-3)

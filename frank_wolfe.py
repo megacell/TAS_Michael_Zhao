@@ -34,8 +34,12 @@ def search_direction(f, graph, g, demand):
     # computes the Frank-Wolfe step
     # g is just a canvas containing the link information and to be updated with 
     # the most recent edge costs
+    # print 'f shape', f.shape
     x = np.power(f.reshape((f.shape[0],1)), np.array([0,1,2,3,4]))
+    # print 'x shape', x.shape
+    # print 'graph shape', graph.shape
     grad = np.einsum('ij,ij->i', x, graph[:,3:])
+    # print 'grad shape', grad.shape
     g[:,3] = grad
     return all_or_nothing(g, demand), grad
 
@@ -52,6 +56,7 @@ def solver(graph, demand, max_iter=100, eps=1e-8, q=None, display=1, past=None,\
     # we change stop to 10^-2 to mimic Frank_wolfe_2
     stop = 1e-2
     links = int(np.max(graph[:,0])+1)
+    print 'links', str(links)
     f = np.zeros(links,dtype="float64") # initial flow assignment is null
     g = np.copy(graph[:,:4])
     K = total_free_flow_cost(g, demand)

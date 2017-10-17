@@ -139,6 +139,14 @@ def solver(graph, demand, g=None, od=None, max_iter=100, eps=1e-8, q=None, \
         print 'iteration', i
         print 'time(sec):', timeit.default_timer() - start_time;
         print 'num path flows:', len(h)
+
+        f_h = np.zeros(graph.shape[0],dtype='float64') # initial flow assignment is null
+        for k in h:
+            flow = h[k]
+            for link in k[2]:
+                f_h[link] += flow
+        print np.sum(np.abs(f_h - f)), f.shape
+
     # find how many paths each od pair really has
     od_paths = defaultdict(int)
     most_paths = 0
@@ -167,6 +175,7 @@ def solver_2(graph, demand, g=None, od=None, max_iter=100, eps=1e-8, q=10, \
     elif display >= 1:
         print 'average free-flow travel time', K / np.sum(demand[:,2])
 
+    start_time = timeit.default_timer()
     for i in range(max_iter):
         if display >= 1:
             if i <= 1:
@@ -189,7 +198,17 @@ def solver_2(graph, demand, g=None, od=None, max_iter=100, eps=1e-8, q=10, \
         f = (1.-s) * f + s * L
         for k in set(h.keys()).union(set(path_flows.keys())):
             h[k] = (1.-s) * h[k] + s * path_flows[k]
+        print 'iteration', i
+        print 'time(sec):', timeit.default_timer() - start_time;
         print 'num path flows:', len(h)
+
+        f_h = np.zeros(graph.shape[0],dtype='float64') # initial flow assignment is null
+        for k in h:
+            flow = h[k]
+            for link in k[2]:
+                f_h[link] += flow
+        print np.sum(np.abs(f_h - f)), f.shape
+
     # find how many paths each od pair really has
     od_paths = defaultdict(int)
     most_paths = 0
@@ -227,6 +246,8 @@ def solver_3(graph, demand, g=None, od=None, past=10, max_iter=100, eps=1e-16, \
         od = construct_od(demand)
     f = np.zeros(graph.shape[0],dtype='float64') # initial flow assignment is null
     fs = np.zeros((graph.shape[0],past),dtype='float64') #not sure what fs does
+    h = defaultdict(np.float64) # initial path flow assignment is null
+    hs = defaultdict(lambda : [0. for _ in range(past)]) # initial path flow assignment is null
     K = total_free_flow_cost(g, od)
 
     # why this?
@@ -236,6 +257,7 @@ def solver_3(graph, demand, g=None, od=None, past=10, max_iter=100, eps=1e-16, \
         print 'average free-flow travel time', K / np.sum(demand[:,2])
 
     #import pdb; pdb.set_trace()
+    start_time = timeit.default_timer()
     for i in range(max_iter):
 
 #        if display >= 1:
@@ -248,10 +270,15 @@ def solver_3(graph, demand, g=None, od=None, past=10, max_iter=100, eps=1e-16, \
     	#start_time2 = timeit.default_timer()
 
         # construct weighted graph with latest flow assignment
-        L, grad = search_direction(f, graph, g, od)
+        L, grad, path_flows = search_direction(f, graph, g, od)
 
         fs[:,i%past] = L
+        for k in set(h.keys()).union(set(path_flows.keys())):
+            hs[k][i%past] = path_flows[k]
         w = L - f
+        w_h = defaultdict(np.float64)
+        for k in set(h.keys()).union(set(path_flows.keys())):
+            w_h[k] = path_flows[k] - h[k]
         if i >= 1:
             error = -grad.dot(w) / K
             # if error < stop and error > 0.0:
@@ -261,6 +288,9 @@ def solver_3(graph, demand, g=None, od=None, past=10, max_iter=100, eps=1e-16, \
         if i > q:
             # step 3 of Fukushima
             v = np.sum(fs,axis=1) / min(past,i+1) - f
+            v_h = np.defaultdict(np.float64)
+            for k in set(hs.keys()).union(set(path_flows.keys())):
+                v_h[k] = sum(hs[k]) / min(past,i+1) - h[k]
             norm_v = np.linalg.norm(v,1)
             if norm_v < eps:
                 if display >= 1: print 'stop with norm_v: {}'.format(norm_v)
@@ -276,6 +306,7 @@ def solver_3(graph, demand, g=None, od=None, past=10, max_iter=100, eps=1e-16, \
                 if display >= 1: print 'stop with gamma_2: {}'.format(gamma_2)
                 return f
             d = v if gamma_1 < gamma_2 else w
+            d_h = v_h if gamma_1 < gamma_2 else w_h
             # step 5 of Fukushima
             s = line_search(lambda a: potential(graph, f+a*d))
             lineSearchResult = s
@@ -283,8 +314,34 @@ def solver_3(graph, demand, g=None, od=None, past=10, max_iter=100, eps=1e-16, \
                 if display >= 1: print 'stop with step_size: {}'.format(s)
                 return f
             f = f + s*d
+            for k in set(hs.keys()).union(set(path_flows.keys())):
+                h[k] = h[k] + s*d_h[k]
         else:
             f = f + 2. * w/(i+2.)
+            for k in set(h.keys()).union(set(path_flows.keys())):
+                h[k] = h[k] + 2.*(w_h[k])/(i+2.)
+        print 'iteration', i
+        print 'time(sec):', timeit.default_timer() - start_time;
+        print 'num path flows:', len(h)
+
+        f_h = np.zeros(graph.shape[0],dtype='float64') # initial flow assignment is null
+        for k in h:
+            flow = h[k]
+            for link in k[2]:
+                f_h[link] += flow
+        print np.sum(np.abs(f_h - f)), f.shape
+
+    # find how many paths each od pair really has
+    od_paths = defaultdict(int)
+    most_paths = 0
+    for k in h.keys():
+        od_paths[(k[:2])] += 1
+        most_paths = max(most_paths, od_paths[(k[:2])])
+    path_counts = [0 for i in range(most_paths + 1)]
+    for k in od_paths.keys():
+        path_counts[od_paths[k]] += 1
+    for i in range(len(path_counts)):
+        print i, path_counts[i]
 
     return f
 
