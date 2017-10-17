@@ -171,6 +171,8 @@ def fw_heterogeneous_2(graphs, demands, past=10, max_iter=100, eps=1e-8, q=50, \
     grad = np.zeros(links*types,dtype="float64")
     L2 = np.zeros(links*types,dtype="float64")
     grad2 = np.zeros(links*types,dtype="float64")
+    h = defaultdict(np.float64) # initial path flow assignment is null
+    hs = defaultdict(lambda : [0. for _ in range(past)]) # initial path flow assignment is null
     # compute re-normalization constant
     K = sum([total_free_flow_cost(g, od) for g,od in zip(gs, ods)])
     if K < eps:
@@ -190,14 +192,16 @@ def fw_heterogeneous_2(graphs, demands, past=10, max_iter=100, eps=1e-8, q=50, \
         #print 'reshape', np.reshape(f,(links,types))
         total_f = np.sum(np.reshape(f,(types,links)).T,1)
         #print 'total flow', total_f
-        for j, (graph, g, od) in enumerate(zip(graphs, gs, ods)):
-            l, gr, pf = search_direction(total_f, graph, g, od)
-            L[(j*links) : ((j+1)*links)] = l
-            grad[(j*links) : ((j+1)*links)] = gr
+        L, grad, path_flows = search_direction_multi(f, graphs, gs, ods, L, grad)
         #print 'L', L
         #print 'grad', grad
         fs[:,i%past] = L
+        for k in set(h.keys()).union(set(path_flows.keys())):
+            hs[k][i%past] = path_flows[k]
         w = L - f
+        w_h = defaultdict(np.float64)
+        for k in set(h.keys()).union(set(path_flows.keys())):
+            w_h[k] = path_flows[k] - h[k]
         if i >= 1:
             error = -grad.dot(w) / K
             # if error < stop and error > 0.0:
@@ -207,6 +211,9 @@ def fw_heterogeneous_2(graphs, demands, past=10, max_iter=100, eps=1e-8, q=50, \
         if i > q:
             # step 3 of Fukushima
             v = np.sum(fs,axis=1) / min(past,i+1) - f
+            v_h = np.defaultdict(np.float64)
+            for k in set(hs.keys()).union(set(path_flows.keys())):
+                v_h[k] = sum(hs[k]) / min(past,i+1) - h[k]
             norm_v = np.linalg.norm(v,1)
             if norm_v < eps: 
                 if display >= 1: print 'stop with norm_v: {}'.format(norm_v)
@@ -222,6 +229,7 @@ def fw_heterogeneous_2(graphs, demands, past=10, max_iter=100, eps=1e-8, q=50, \
                 if display >= 1: print 'stop with gamma_2: {}'.format(gamma_2)
                 return np.reshape(f,(types,links)).T
             d = v if gamma_1 < gamma_2 else w
+            d_h = v_h if gamma_1 < gamma_2 else w_h
             # step 5 of Fukushima
             s = line_search(lambda a: merit(f+a*d, graphs, gs, ods, L2, grad2))
             # print 'step', s
@@ -229,8 +237,35 @@ def fw_heterogeneous_2(graphs, demands, past=10, max_iter=100, eps=1e-8, q=50, \
                 if display >= 1: print 'stop with step_size: {}'.format(s)
                 return np.reshape(f,(types,links)).T
             f = f + s*d
+            for k in set(hs.keys()).union(set(path_flows.keys())):
+                h[k] = h[k] + s*d_h[k]
         else:
             f = f + 2. * w/(i+2.)
+            for k in set(h.keys()).union(set(path_flows.keys())):
+                h[k] = h[k] + 2.*(w_h[k])/(i+2.)
+        print 'iteration', i
+        print 'time(sec):', timeit.default_timer() - start_time;
+        print 'num path flows:', len(h)
+
+        f_h = np.zeros(graph.shape[0],dtype='float64') # initial flow assignment is null
+        for k in h:
+            flow = h[k]
+            for link in k[2]:
+                f_h[link] += flow
+        print "path vs link flow diff:", np.sum(np.abs(f_h - f)), f.shape
+
+    # find how many paths each od pair really has
+    od_paths = defaultdict(int)
+    most_paths = 0
+    for k in h.keys():
+        od_paths[(k[:2])] += 1
+        most_paths = max(most_paths, od_paths[(k[:2])])
+    path_counts = [0 for i in range(most_paths + 1)]
+    for k in od_paths.keys():
+        path_counts[od_paths[k]] += 1
+    for i in range(len(path_counts)):
+        print i, path_counts[i]
+
     return np.reshape(f,(types,links)).T
 
 
@@ -255,7 +290,7 @@ def parametric_study_2(alphas, g, d, node, geometry, thres, cog_cost, output, \
         else:
             print 'non-routed = {}, routed = {}'.format(1-alpha, alpha)
             d_nr, d_r = heterogeneous_demand(d, alpha)
-            fs = fw_heterogeneous_1([g_nr,g], [d_nr,d_r], max_iter=1000, \
+            fs = fw_heterogeneous_2([g_nr,g], [d_nr,d_r], max_iter=1000, \
                 display=1, stop=stop)
         np.savetxt(output.format(int(alpha*100)), fs, \
             delimiter=',', header='f_nr,f_r')
