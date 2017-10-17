@@ -5,11 +5,12 @@ __email__ = "jerome.thai@berkeley.edu"
 import numpy as np
 from AoN_igraph import all_or_nothing
 from frank_wolfe_2 import total_free_flow_cost, search_direction, line_search, solver_3
-from process_data import construct_igraph, construct_od
+from process_data import construct_igraph, construct_od, extract_features
 from utils import multiply_cognitive_cost, heterogeneous_demand
 
 #Profiling the code
 import timeit
+from collections import defaultdict
 
 
 
@@ -20,6 +21,8 @@ def search_direction_multi(f, graphs, gs, ods, L, grad):
     #start timer
     start_time1 = timeit.default_timer()
 
+    path_flows = defaultdict(np.float64)
+
     links = graphs[0].shape[0]
     types = len(graphs)
     for j, (graph, g, od) in enumerate(zip(graphs, gs, ods)):
@@ -27,7 +30,7 @@ def search_direction_multi(f, graphs, gs, ods, L, grad):
         #start timer
     	start_time2 = timeit.default_timer()
 
-        l, gr, path_flows = search_direction(np.sum(np.reshape(f,(types,links)).T,1), \
+        l, gr, pf = search_direction(np.sum(np.reshape(f,(types,links)).T,1), \
             graph, g, od)
 
     	#end of timer
@@ -37,18 +40,20 @@ def search_direction_multi(f, graphs, gs, ods, L, grad):
 
         L[(j*links) : ((j+1)*links)] = l
         grad[(j*links) : ((j+1)*links)] = gr
+        for k in pf:
+            path_flows[k + (j,)] = pf[k]
 
     #end of timer
     #elapsed1 = timeit.default_timer() - start_time1;
     #print ("Search_direction for all pairs: %s seconds" % elapsed1)
 
-    return L, grad
+    return L, grad, path_flows
 
 
 def merit(f, graphs, gs, ods, L, grad):
     # this computes the merit function associated to the VI problem
     # max_y <F(x), x-y>
-    L, grad = search_direction_multi(f, graphs, gs, ods, L, grad)
+    L, grad, path_flows = search_direction_multi(f, graphs, gs, ods, L, grad)
     return grad.dot(f - L)
 
 
@@ -73,6 +78,7 @@ def fw_heterogeneous_1(graphs, demands, max_iter=100, eps=1e-8, q=None, \
     f = np.zeros(links*types,dtype="float64") # initial flow assignment is null
     L = np.zeros(links*types,dtype="float64")
     grad = np.zeros(links*types,dtype="float64")
+    h = defaultdict(np.float64) # initial path flow assignment is null
     # compute re-normalization constant
     K = sum([total_free_flow_cost(g, od) for g,od in zip(gs, ods)])
     if K < eps:
@@ -86,6 +92,7 @@ def fw_heterogeneous_1(graphs, demands, max_iter=100, eps=1e-8, q=None, \
     #print ("step0 too %s seconds" % elapsed1)
 
     # compute iterations
+    start_time = timeit.default_timer()
     for i in range(max_iter):
         #start timer
         #start_time3 = timeit.default_timer()
@@ -100,7 +107,7 @@ def fw_heterogeneous_1(graphs, demands, max_iter=100, eps=1e-8, q=None, \
         #start_time2 = timeit.default_timer()
 
         # construct weighted graph with latest flow assignment
-        L, grad = search_direction_multi(f, graphs, gs, ods, L, grad)
+        L, grad, path_flows = search_direction_multi(f, graphs, gs, ods, L, grad)
 
         #end of timer
         #elapsed2 = timeit.default_timer() - start_time2;
@@ -110,10 +117,35 @@ def fw_heterogeneous_1(graphs, demands, max_iter=100, eps=1e-8, q=None, \
             error = grad.dot(f - L) / K
             if error < stop: return np.reshape(f,(types,links)).T
         f = f + 2.*(L-f)/(i+2.)
+        for k in set(h.keys()).union(set(path_flows.keys())):
+            h[k] = h[k] + 2.*(path_flows[k]-h[k])/(i+2.)
+        print 'iteration', i
+        print 'time(sec):', timeit.default_timer() - start_time;
+        print 'num path flows:', len(h)
+
+        f_h = np.zeros(graph.shape[0],dtype='float64') # initial flow assignment is null
+        for k in h:
+            flow = h[k]
+            for link in k[2]:
+                f_h[link] += flow
+        print "path vs link flow diff:", np.sum(np.abs(f_h - np.sum(np.reshape(f,(types,links)).T,1))), f.shape
 
         #end of timer
         #elapsed3 = timeit.default_timer() - start_time3;
         #print ("The whole iteration took %s seconds" % elapsed3)
+
+    # find how many paths each od pair really has
+    od_paths = defaultdict(int)
+    most_paths = 0
+    for k in h.keys():
+        od_paths[(k[:2])] += 1
+        most_paths = max(most_paths, od_paths[(k[:2])])
+    path_counts = [0 for i in range(most_paths + 1)]
+    for k in od_paths.keys():
+        path_counts[od_paths[k]] += 1
+    for i in range(len(path_counts)):
+        print i, path_counts[i]
+
     return np.reshape(f,(types,links)).T
 
 
@@ -159,7 +191,7 @@ def fw_heterogeneous_2(graphs, demands, past=10, max_iter=100, eps=1e-8, q=50, \
         total_f = np.sum(np.reshape(f,(types,links)).T,1)
         #print 'total flow', total_f
         for j, (graph, g, od) in enumerate(zip(graphs, gs, ods)):
-            l, gr = search_direction(total_f, graph, g, od)
+            l, gr, pf = search_direction(total_f, graph, g, od)
             L[(j*links) : ((j+1)*links)] = l
             grad[(j*links) : ((j+1)*links)] = gr
         #print 'L', L
@@ -253,3 +285,34 @@ def parametric_study_3(alphas, beta, g, d, node, geometry, thres, cog_cost, outp
                 display=1, stop=stop)
         np.savetxt(output.format(int(alpha*100),int(beta*100)), fs, \
             delimiter=',', header='f_nr,f_r')
+
+
+def main():
+    #braess_parametric_study()
+    #start timer
+    start_time2 = timeit.default_timer()
+    graph = np.loadtxt('data/LA_net.csv', delimiter=',', skiprows=1)
+    demand = np.loadtxt('data/LA_od_2.csv', delimiter=',', skiprows=1)
+    graph[10787,-1] = graph[10787,-1] / (1.5**4)
+    graph[3348,-1] = graph[3348,-1] / (1.2**4)
+    node = np.loadtxt('data/LA_node.csv', delimiter=',')
+    # features = table in the format [[capacity, length, FreeFlowTime]]
+    features = extract_features('data/LA_net.txt')
+
+    alpha = .2
+    thres = 1000.
+    cog_cost = 3000.
+
+    demand[:,2] = 0.5*demand[:,2] / 4000
+    g_nr, small_capacity = multiply_cognitive_cost(graph, features, thres, cog_cost)
+    d_nr, d_r = heterogeneous_demand(demand, alpha)
+    fs = fw_heterogeneous_1([g_nr,graph], [d_nr,d_r], max_iter=1000, display=1)
+
+    #end of timer
+    elapsed2 = timeit.default_timer() - start_time2;
+    print ("Execution took %s seconds" % elapsed2)
+    visualize_LA()
+
+
+if __name__ == '__main__':
+    main()

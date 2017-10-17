@@ -10,6 +10,7 @@ from process_data import extract_features, process_links, geojson_link, \
     process_trips, process_net, process_node, array_to_trips, process_results
 from metrics import average_cost, cost_ratio, cost, save_metrics
 from frank_wolfe_2 import solver, solver_2, solver_3
+from frank_wolfe_heterogeneous import fw_heterogeneous_1, fw_heterogeneous_2
 from multi_types_solver import gauss_seidel
 from All_Or_Nothing import all_or_nothing
 from scripts_LA import load_LA

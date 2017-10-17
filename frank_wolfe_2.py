@@ -145,7 +145,7 @@ def solver(graph, demand, g=None, od=None, max_iter=100, eps=1e-8, q=None, \
             flow = h[k]
             for link in k[2]:
                 f_h[link] += flow
-        print np.sum(np.abs(f_h - f)), f.shape
+        print "path vs link flow diff:", np.sum(np.abs(f_h - f)), f.shape
 
     # find how many paths each od pair really has
     od_paths = defaultdict(int)
@@ -207,7 +207,7 @@ def solver_2(graph, demand, g=None, od=None, max_iter=100, eps=1e-8, q=10, \
             flow = h[k]
             for link in k[2]:
                 f_h[link] += flow
-        print np.sum(np.abs(f_h - f)), f.shape
+        print "path vs link flow diff:", np.sum(np.abs(f_h - f)), f.shape
 
     # find how many paths each od pair really has
     od_paths = defaultdict(int)
@@ -329,7 +329,7 @@ def solver_3(graph, demand, g=None, od=None, past=10, max_iter=100, eps=1e-16, \
             flow = h[k]
             for link in k[2]:
                 f_h[link] += flow
-        print np.sum(np.abs(f_h - f)), f.shape
+        print "path vs link flow diff:", np.sum(np.abs(f_h - f)), f.shape
 
     # find how many paths each od pair really has
     od_paths = defaultdict(int)
