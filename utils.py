@@ -34,6 +34,27 @@ def multiply_cognitive_cost(net, feat, thres, cog_cost):
             net2[row,3:] = net2[row,3:] * cog_cost
     return net2, small_capacity
 
+def restrict_path_choice(net, feat, thres):
+    '''
+    given a numpy array 'net' of the form [[link_id, from, to, a0, a1, ..]]
+    and numpy array 'feat' containing [[capacity, length, FreeFlowTime]]
+    return a net with only links that have capacity in feat above a threshold
+    '''
+    choices = 0
+    for row in range(net.shape[0]):
+        if feat[row,0] >= thres:
+            choices += 1
+
+    net2 = np.zeros((choices,) + (net.shape[1:]))
+    index = 0
+    for row in range(net.shape[0]):
+        if feat[row,0] >= thres:
+            net2[index] = net[row]
+            index += 1
+    print choices, len(net)
+    assert(choices == index)
+    return net2 # ALSO RETURN A LIST OF CURRENT INDICIES TO OLD
+
 
 def modify_capacity(net, links_affected, beta):
     '''
