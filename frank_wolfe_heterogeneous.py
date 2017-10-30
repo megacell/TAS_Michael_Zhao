@@ -78,7 +78,7 @@ def fw_heterogeneous_1(graphs, demands, max_iter=100, eps=1e-8, q=None, \
     f = np.zeros(links*types,dtype="float64") # initial flow assignment is null
     L = np.zeros(links*types,dtype="float64")
     grad = np.zeros(links*types,dtype="float64")
-    h = defaultdict(np.float64) # initial path flow assignment is null
+    h = [defaultdict(np.float64) for _ in range(types)] # initial path flow assignment is null
     # compute re-normalization constant
     K = sum([total_free_flow_cost(g, od) for g,od in zip(gs, ods)])
     if K < eps:

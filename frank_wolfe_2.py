@@ -132,7 +132,7 @@ def solver(graph, demand, g=None, od=None, max_iter=100, eps=1e-8, q=None, \
         L, grad, path_flows = search_direction(f, graph, g, od)
         if i >= 1:
             error = grad.dot(f - L) / K
-            if error < stop: return f
+            if error < stop: return f, h
         f = f + 2.*(L-f)/(i+2.)
         for k in set(h.keys()).union(set(path_flows.keys())):
             h[k] = h[k] + 2.*(path_flows[k]-h[k])/(i+2.)
@@ -158,7 +158,7 @@ def solver(graph, demand, g=None, od=None, max_iter=100, eps=1e-8, q=None, \
         path_counts[od_paths[k]] += 1
     for i in range(len(path_counts)):
         print i, path_counts[i]
-    return f
+    return f, h
 
 
 def solver_2(graph, demand, g=None, od=None, max_iter=100, eps=1e-8, q=10, \
@@ -187,14 +187,14 @@ def solver_2(graph, demand, g=None, od=None, max_iter=100, eps=1e-8, q=10, \
         if i >= 1:
             # w = f - L
             # norm_w = np.linalg.norm(w,1)
-            # if norm_w < eps: return f
+            # if norm_w < eps: return f, h
             error = grad.dot(f - L) / K
-            if error < stop: return f
+            if error < stop: return f, h
         # s = line_search(lambda a: potential(graph, (1.-a)*f+a*L)) if i>max_iter-q \
         #     else 2./(i+2.)
         s = line_search(lambda a: potential(graph, (1.-a)*f+a*L)) if i%ls==(ls-1) \
             else 2./(i+2.)
-        if s < eps: return f
+        if s < eps: return f, h
         f = (1.-s) * f + s * L
         for k in set(h.keys()).union(set(path_flows.keys())):
             h[k] = (1.-s) * h[k] + s * path_flows[k]
@@ -220,7 +220,7 @@ def solver_2(graph, demand, g=None, od=None, max_iter=100, eps=1e-8, q=10, \
         path_counts[od_paths[k]] += 1
     for i in range(len(path_counts)):
         print i, path_counts[i]
-    return f
+    return f, h
 
 
 def solver_3(graph, demand, g=None, od=None, past=10, max_iter=100, eps=1e-16, \
@@ -284,7 +284,7 @@ def solver_3(graph, demand, g=None, od=None, past=10, max_iter=100, eps=1e-16, \
             # if error < stop and error > 0.0:
             if error < stop:
                 if display >= 1: print 'stop with error: {}'.format(error)
-                return f
+                return f, h
         if i > q:
             # step 3 of Fukushima
             v = np.sum(fs,axis=1) / min(past,i+1) - f
@@ -294,17 +294,17 @@ def solver_3(graph, demand, g=None, od=None, past=10, max_iter=100, eps=1e-16, \
             norm_v = np.linalg.norm(v,1)
             if norm_v < eps:
                 if display >= 1: print 'stop with norm_v: {}'.format(norm_v)
-                return f
+                return f, h
             norm_w = np.linalg.norm(w,1)
             if norm_w < eps:
                 if display >= 1: print 'stop with norm_w: {}'.format(norm_w)
-                return f
+                return f, h
             # step 4 of Fukushima
             gamma_1 = grad.dot(v) / norm_v
             gamma_2 = grad.dot(w) / norm_w
             if gamma_2 > -eps:
                 if display >= 1: print 'stop with gamma_2: {}'.format(gamma_2)
-                return f
+                return f, h
             d = v if gamma_1 < gamma_2 else w
             d_h = v_h if gamma_1 < gamma_2 else w_h
             # step 5 of Fukushima
@@ -312,7 +312,7 @@ def solver_3(graph, demand, g=None, od=None, past=10, max_iter=100, eps=1e-16, \
             lineSearchResult = s
             if s < eps:
                 if display >= 1: print 'stop with step_size: {}'.format(s)
-                return f
+                return f, h
             f = f + s*d
             for k in set(hs.keys()).union(set(path_flows.keys())):
                 h[k] = h[k] + s*d_h[k]
@@ -343,7 +343,7 @@ def solver_3(graph, demand, g=None, od=None, past=10, max_iter=100, eps=1e-16, \
     for i in range(len(path_counts)):
         print i, path_counts[i]
 
-    return f
+    return f, h
 
 
 def single_class_parametric_study(factors, output, net, demand, \

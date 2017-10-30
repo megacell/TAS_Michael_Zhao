@@ -162,7 +162,7 @@ def solver(graph, demand, demand_fixed, g=None, od=None, od_fixed=None, max_iter
         L, grad, path_flows = search_direction_with_fixed(f, f_fixed, graph, g, od)
         if i >= 1:
             error = grad.dot(f - L) / K
-            if error < stop: return f
+            if error < stop: return f, h
         f = f + 2.*(L-f)/(i+2.)
         for k in set(h.keys()).union(set(path_flows.keys())):
             h[k] = h[k] + 2.*(path_flows[k]-h[k])/(i+2.)
@@ -203,16 +203,18 @@ def solver(graph, demand, demand_fixed, g=None, od=None, od_fixed=None, max_iter
         path_counts[od_paths[k]] += 1
     for i in range(len(path_counts)):
         print i, path_counts[i]
-    return f
+    return f, h
 
 
-def solver_2(graph, demand, g=None, od=None, max_iter=100, eps=1e-8, q=10, \
+def solver_2(graph, demand, demand_fixed, g=None, od=None, od_fixed=None, max_iter=100, eps=1e-8, q=10, \
     display=0, past=None, stop=1e-8):
 
     if g is None: g = construct_igraph(graph)
     if od is None: od = construct_od(demand)
+    if od_fixed is None: od_fixed = construct_od(demand_fixed)
     f = np.zeros(graph.shape[0],dtype='float64') # initial flow assignment is null
     h = defaultdict(np.float64) # initial path flow assignment is null
+    f_fixed, _, h_fixed = search_direction(f, graph, g, od_fixed)
     ls = max_iter/q # frequency of line search
     K = total_free_flow_cost(g, od)
     if K < eps:
@@ -228,18 +230,19 @@ def solver_2(graph, demand, g=None, od=None, max_iter=100, eps=1e-8, q=10, \
             else:
                 print 'iteration: {}, error: {}'.format(i+1, error)
         # construct weighted graph with latest flow assignment
-        L, grad, path_flows = search_direction(f, graph, g, od)
+        L, grad, path_flows = search_direction_with_fixed(f, f_fixed, graph, g, od)
+        
         if i >= 1:
             # w = f - L
             # norm_w = np.linalg.norm(w,1)
-            # if norm_w < eps: return f
+            # if norm_w < eps: return f, h
             error = grad.dot(f - L) / K
-            if error < stop: return f
+            if error < stop: return f, h
         # s = line_search(lambda a: potential(graph, (1.-a)*f+a*L)) if i>max_iter-q \
         #     else 2./(i+2.)
         s = line_search(lambda a: potential(graph, (1.-a)*f+a*L)) if i%ls==(ls-1) \
             else 2./(i+2.)
-        if s < eps: return f
+        if s < eps: return f, h
         f = (1.-s) * f + s * L
         for k in set(h.keys()).union(set(path_flows.keys())):
             h[k] = (1.-s) * h[k] + s * path_flows[k]
@@ -254,6 +257,21 @@ def solver_2(graph, demand, g=None, od=None, max_iter=100, eps=1e-8, q=10, \
                 f_h[link] += flow
         print "path vs link flow diff:", np.sum(np.abs(f_h - f)), f.shape
 
+    f += f_fixed
+    for k in set(h.keys()).union(set(h_fixed.keys())):
+        h[k] += h_fixed[k]
+
+    print 'added in fixed flows'
+    print 'num path flows:', len(h)
+    f_h = np.zeros(graph.shape[0],dtype='float64') # initial flow assignment is null
+    for k in h:
+        flow = h[k]
+        for link in k[2]:
+            f_h[link] += flow
+    print "[total] path link flow total:", np.sum(np.abs(f_h)), f.shape
+    print "[total] link link flow total:", np.sum(np.abs(f)), f.shape
+    print "[total] path vs link flow diff:", np.sum(np.abs(f_h - f)), f.shape
+
     # find how many paths each od pair really has
     od_paths = defaultdict(int)
     most_paths = 0
@@ -265,10 +283,10 @@ def solver_2(graph, demand, g=None, od=None, max_iter=100, eps=1e-8, q=10, \
         path_counts[od_paths[k]] += 1
     for i in range(len(path_counts)):
         print i, path_counts[i]
-    return f
+    return f, h
 
 
-def solver_3(graph, demand, g=None, od=None, past=10, max_iter=100, eps=1e-16, \
+def solver_3(graph, demand, demand_fixed, g=None, od=None, od_fixed=None, past=10, max_iter=100, eps=1e-16, \
     q=50, display=0, stop=1e-8):
     '''
     this is an adaptation of Fukushima's algorithm
@@ -289,10 +307,13 @@ def solver_3(graph, demand, g=None, od=None, past=10, max_iter=100, eps=1e-16, \
         g = construct_igraph(graph)
     if od is None:
         od = construct_od(demand)
+    if od_fixed is None:
+        od_fixed = construct_od(demand_fixed)
     f = np.zeros(graph.shape[0],dtype='float64') # initial flow assignment is null
     fs = np.zeros((graph.shape[0],past),dtype='float64') #not sure what fs does
     h = defaultdict(np.float64) # initial path flow assignment is null
     hs = defaultdict(lambda : [0. for _ in range(past)]) # initial path flow assignment is null
+    f_fixed, _, h_fixed = search_direction(f, graph, g, od_fixed)
     K = total_free_flow_cost(g, od)
 
     # why this?
@@ -315,8 +336,8 @@ def solver_3(graph, demand, g=None, od=None, past=10, max_iter=100, eps=1e-16, \
         #start_time2 = timeit.default_timer()
 
         # construct weighted graph with latest flow assignment
-        L, grad, path_flows = search_direction(f, graph, g, od)
-
+        L, grad, path_flows = search_direction_with_fixed(f, f_fixed, graph, g, od)
+        
         fs[:,i%past] = L
         for k in set(h.keys()).union(set(path_flows.keys())):
             hs[k][i%past] = path_flows[k]
@@ -329,7 +350,7 @@ def solver_3(graph, demand, g=None, od=None, past=10, max_iter=100, eps=1e-16, \
             # if error < stop and error > 0.0:
             if error < stop:
                 if display >= 1: print 'stop with error: {}'.format(error)
-                return f
+                return f, h
         if i > q:
             # step 3 of Fukushima
             v = np.sum(fs,axis=1) / min(past,i+1) - f
@@ -339,17 +360,17 @@ def solver_3(graph, demand, g=None, od=None, past=10, max_iter=100, eps=1e-16, \
             norm_v = np.linalg.norm(v,1)
             if norm_v < eps:
                 if display >= 1: print 'stop with norm_v: {}'.format(norm_v)
-                return f
+                return f, h
             norm_w = np.linalg.norm(w,1)
             if norm_w < eps:
                 if display >= 1: print 'stop with norm_w: {}'.format(norm_w)
-                return f
+                return f, h
             # step 4 of Fukushima
             gamma_1 = grad.dot(v) / norm_v
             gamma_2 = grad.dot(w) / norm_w
             if gamma_2 > -eps:
                 if display >= 1: print 'stop with gamma_2: {}'.format(gamma_2)
-                return f
+                return f, h
             d = v if gamma_1 < gamma_2 else w
             d_h = v_h if gamma_1 < gamma_2 else w_h
             # step 5 of Fukushima
@@ -357,7 +378,7 @@ def solver_3(graph, demand, g=None, od=None, past=10, max_iter=100, eps=1e-16, \
             lineSearchResult = s
             if s < eps:
                 if display >= 1: print 'stop with step_size: {}'.format(s)
-                return f
+                return f, h
             f = f + s*d
             for k in set(hs.keys()).union(set(path_flows.keys())):
                 h[k] = h[k] + s*d_h[k]
@@ -376,6 +397,21 @@ def solver_3(graph, demand, g=None, od=None, past=10, max_iter=100, eps=1e-16, \
                 f_h[link] += flow
         print "path vs link flow diff:", np.sum(np.abs(f_h - f)), f.shape
 
+    f += f_fixed
+    for k in set(h.keys()).union(set(h_fixed.keys())):
+        h[k] += h_fixed[k]
+
+    print 'added in fixed flows'
+    print 'num path flows:', len(h)
+    f_h = np.zeros(graph.shape[0],dtype='float64') # initial flow assignment is null
+    for k in h:
+        flow = h[k]
+        for link in k[2]:
+            f_h[link] += flow
+    print "[total] path link flow total:", np.sum(np.abs(f_h)), f.shape
+    print "[total] link link flow total:", np.sum(np.abs(f)), f.shape
+    print "[total] path vs link flow diff:", np.sum(np.abs(f_h - f)), f.shape
+
     # find how many paths each od pair really has
     od_paths = defaultdict(int)
     most_paths = 0
@@ -388,7 +424,7 @@ def solver_3(graph, demand, g=None, od=None, past=10, max_iter=100, eps=1e-16, \
     for i in range(len(path_counts)):
         print i, path_counts[i]
 
-    return f
+    return f, h
 
 
 def single_class_parametric_study(factors, output, net, demand, \
@@ -428,7 +464,7 @@ def main():
 
     demand[:,2] = 0.5*demand[:,2] / 4000
     d_nr, d_r = heterogeneous_demand(demand, alpha)
-    fs = solver(graph, d_nr, d_r, max_iter=10, display=1)
+    f, h = solver_3(graph, d_nr, d_r, max_iter=10, display=1)
 
     #end of timer
     elapsed2 = timeit.default_timer() - start_time2;
