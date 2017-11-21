@@ -327,32 +327,45 @@ def parametric_study_3(alphas, beta, g, d, node, geometry, thres, cog_cost, outp
         np.savetxt(output.format(int(alpha*100),int(beta*100)), fs, \
             delimiter=',', header='f_nr,f_r')
 
+import json
 
 def main():
     #braess_parametric_study()
     #start timer
-    start_time2 = timeit.default_timer()
-    graph = np.loadtxt('data/LA_net.csv', delimiter=',', skiprows=1)
-    demand = np.loadtxt('data/LA_od_2.csv', delimiter=',', skiprows=1)
-    graph[10787,-1] = graph[10787,-1] / (1.5**4)
-    graph[3348,-1] = graph[3348,-1] / (1.2**4)
-    node = np.loadtxt('data/LA_node.csv', delimiter=',')
-    # features = table in the format [[capacity, length, FreeFlowTime]]
-    features = extract_features('data/LA_net.txt')
+    for alpha in np.linspace(0, 1, 11):
+        start_time2 = timeit.default_timer()
+        graph = np.loadtxt('data/LA_net.csv', delimiter=',', skiprows=1)
+        demand = np.loadtxt('data/LA_od_2.csv', delimiter=',', skiprows=1)
+        graph[10787,-1] = graph[10787,-1] / (1.5**4)
+        graph[3348,-1] = graph[3348,-1] / (1.2**4)
+        node = np.loadtxt('data/LA_node.csv', delimiter=',')
+        # features = table in the format [[capacity, length, FreeFlowTime]]
+        features = extract_features('data/LA_net.txt')
 
-    alpha = .2 # also known as r
-    thres = 1000.
-    cog_cost = 3000.
+        # alpha = .2 # also known as r
+        thres = 1000.
+        cog_cost = 3000.
 
-    demand[:,2] = 0.5*demand[:,2] / 4000
-    g_nr, small_capacity = multiply_cognitive_cost(graph, features, thres, cog_cost)
-    d_nr, d_r = heterogeneous_demand(demand, alpha)
-    fs, h, n_d = fw_heterogeneous_1([graph, g_nr], [d_r,d_nr], alpha, max_iter=5, display=1)
+        demand[:,2] = 0.5*demand[:,2] / 4000
+        g_nr, small_capacity = multiply_cognitive_cost(graph, features, thres, cog_cost)
+        d_nr, d_r = heterogeneous_demand(demand, alpha)
+        fs, hs, n_d = fw_heterogeneous_1([graph, g_nr], [d_r,d_nr], alpha, max_iter=5, display=1)
+        print n_d
 
-    #end of timer
-    elapsed2 = timeit.default_timer() - start_time2;
-    print ("Execution took %s seconds" % elapsed2)
-    visualize_LA()
+        output = {
+            'f': fs,
+            'h': hs,
+            'n_d': n_d
+        }
+
+        with open('graph_stuff/LA_net_od_2_alpha_{}.txt'.format(alpha), 'w') as outfile:
+            outfile.write(json.dumps(output))
+
+        #end of timer
+        elapsed2 = timeit.default_timer() - start_time2;
+        break
+        print ("Execution took %s seconds" % elapsed2)
+    # visualize_LA()
 
 
 if __name__ == '__main__':
