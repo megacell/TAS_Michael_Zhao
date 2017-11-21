@@ -95,6 +95,9 @@ def search_direction_with_fixed(f, f_fixed, graph, g, od):
     #start timer
     #start_time1 = timeit.default_timer()
 
+    # L_total, path_flows = all_or_nothing(g, od)
+    # L = L_total - f_fixed
+
     L, path_flows = all_or_nothing(g, od)
 
     print len(path_flows)

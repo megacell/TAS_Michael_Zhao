@@ -57,7 +57,7 @@ def merit(f, graphs, gs, ods, L, grad):
     return grad.dot(f - L)
 
 
-def fw_heterogeneous_1(graphs, demands, max_iter=100, eps=1e-8, q=None, \
+def fw_heterogeneous_1(graphs, demands, r, max_iter=100, eps=1e-8, q=None, \
     display=0, past=None, stop=1e-8):
     '''
     Frank-Wolfe algorithm on the heterogeneous game
@@ -65,6 +65,7 @@ def fw_heterogeneous_1(graphs, demands, max_iter=100, eps=1e-8, q=None, \
     g = [[link_id from to a0 a1 a2 a3 a4]]
     and demand in the format
     d = [[o d flow]]
+    r = % app users
     '''
     #start timer
     #start_time1 = timeit.default_timer()
@@ -78,7 +79,7 @@ def fw_heterogeneous_1(graphs, demands, max_iter=100, eps=1e-8, q=None, \
     f = np.zeros(links*types,dtype="float64") # initial flow assignment is null
     L = np.zeros(links*types,dtype="float64")
     grad = np.zeros(links*types,dtype="float64")
-    h = [defaultdict(np.float64) for _ in range(types)] # initial path flow assignment is null
+    h = defaultdict(np.float64) # initial path flow assignment is null
     # compute re-normalization constant
     K = sum([total_free_flow_cost(g, od) for g,od in zip(gs, ods)])
     if K < eps:
@@ -115,8 +116,11 @@ def fw_heterogeneous_1(graphs, demands, max_iter=100, eps=1e-8, q=None, \
 
         if i >= 1:
             error = grad.dot(f - L) / K
-            if error < stop: return np.reshape(f,(types,links)).T
+            if error < stop:
+                return np.reshape(f,(types,links)).T, h, np.dot(grad[:links], np.sum(np.reshape(f,(types,links)).T,1) - np.sum(np.reshape(L,(types,links)).T,1) / r)
+
         f = f + 2.*(L-f)/(i+2.)
+        # print type(h), type(path_flows)
         for k in set(h.keys()).union(set(path_flows.keys())):
             h[k] = h[k] + 2.*(path_flows[k]-h[k])/(i+2.)
         print 'iteration', i
@@ -146,7 +150,8 @@ def fw_heterogeneous_1(graphs, demands, max_iter=100, eps=1e-8, q=None, \
     for i in range(len(path_counts)):
         print i, path_counts[i]
 
-    return np.reshape(f,(types,links)).T
+    L, grad, path_flows = search_direction_multi(f, graphs, gs, ods, L, grad)
+    return np.reshape(f,(types,links)).T, h, np.dot(grad[:links], np.sum(np.reshape(f,(types,links)).T,1) - np.sum(np.reshape(L,(types,links)).T,1) / r)
 
 
 def fw_heterogeneous_2(graphs, demands, past=10, max_iter=100, eps=1e-8, q=50, \
@@ -335,14 +340,14 @@ def main():
     # features = table in the format [[capacity, length, FreeFlowTime]]
     features = extract_features('data/LA_net.txt')
 
-    alpha = .2
+    alpha = .2 # also known as r
     thres = 1000.
     cog_cost = 3000.
 
     demand[:,2] = 0.5*demand[:,2] / 4000
     g_nr, small_capacity = multiply_cognitive_cost(graph, features, thres, cog_cost)
     d_nr, d_r = heterogeneous_demand(demand, alpha)
-    fs = fw_heterogeneous_2([g_nr,graph], [d_nr,d_r], max_iter=1000, display=1)
+    fs, h, n_d = fw_heterogeneous_1([graph, g_nr], [d_r,d_nr], alpha, max_iter=5, display=1)
 
     #end of timer
     elapsed2 = timeit.default_timer() - start_time2;

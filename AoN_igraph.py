@@ -26,6 +26,7 @@ def all_or_nothing(g, od):
             # if len(inds) == 0: 
                 # print 'no path between {} and {}'.format(o, od[o][0][i])
             L[inds] = L[inds] + od[o][1][i]
+            # print "i", od[o][1][i]
 
             path_flows[(o, od[o][0][i], tuple(inds))] += od[o][1][i]
 

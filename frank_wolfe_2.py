@@ -62,6 +62,8 @@ def search_direction(f, graph, g, od):
     # the most recent edge costs
     x = np.power(f.reshape((f.shape[0],1)), np.array([0,1,2,3,4]))
     grad = np.einsum('ij,ij->i', x, graph[:,3:])
+    # print x.shape, graph[:,3:].shape, grad.shape
+    # print x[0], graph[:,3:][0], grad[0]
     g.es['weight'] = grad.tolist()
 
     #start timer
@@ -69,7 +71,7 @@ def search_direction(f, graph, g, od):
 
     L, path_flows = all_or_nothing(g, od)
 
-    print len(path_flows)
+    # print len(path_flows)
     # for k in path_flows:
     #     print k, path_flows[k]
     #     exit(1)
