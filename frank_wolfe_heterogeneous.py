@@ -117,7 +117,7 @@ def fw_heterogeneous_1(graphs, demands, r, max_iter=100, eps=1e-8, q=None, \
         if i >= 1:
             error = grad.dot(f - L) / K
             if error < stop:
-                return np.reshape(f,(types,links)).T, h, np.dot(grad[:links], np.sum(np.reshape(f,(types,links)).T,1) - np.sum(np.reshape(L,(types,links)).T,1) / r)
+                return np.reshape(f,(types,links)).T, h, np.dot(grad[:links], np.sum(np.reshape(f,(types,links)).T,1) - np.sum(np.reshape(L,(types,links)).T,1) * r)
 
         f = f + 2.*(L-f)/(i+2.)
         # print type(h), type(path_flows)
@@ -151,7 +151,7 @@ def fw_heterogeneous_1(graphs, demands, r, max_iter=100, eps=1e-8, q=None, \
         print i, path_counts[i]
 
     L, grad, path_flows = search_direction_multi(f, graphs, gs, ods, L, grad)
-    return np.reshape(f,(types,links)).T, h, np.dot(grad[:links], np.sum(np.reshape(f,(types,links)).T,1) - np.sum(np.reshape(L,(types,links)).T,1) / r)
+    return np.reshape(f,(types,links)).T, h, np.dot(grad[:links], np.sum(np.reshape(f,(types,links)).T,1) - np.sum(np.reshape(L,(types,links)).T,1) * r)
 
 
 def fw_heterogeneous_2(graphs, demands, past=10, max_iter=100, eps=1e-8, q=50, \
@@ -328,11 +328,23 @@ def parametric_study_3(alphas, beta, g, d, node, geometry, thres, cog_cost, outp
             delimiter=',', header='f_nr,f_r')
 
 import json
+import cPickle as pickle
 
 def main():
     #braess_parametric_study()
     #start timer
-    for alpha in np.linspace(0, 1, 11):
+    # for alpha in np.linspace(.05, .95, 10):
+    # for alpha in np.linspace(.05, .45, 5):
+    # for alpha in np.linspace(.55, .95, 5):
+    # print np.linspace(0, .49, 50)
+    # print np.linspace(0.00, 1.00, 21)
+    # exit(1)
+
+    # for alpha in np.linspace(0, .49, 50):
+    for alpha in np.linspace(.5, .99, 50):
+        if alpha in np.linspace(0.00, 1.00, 21):
+            continue
+        print "ALPHA:", alpha
         start_time2 = timeit.default_timer()
         graph = np.loadtxt('data/LA_net.csv', delimiter=',', skiprows=1)
         demand = np.loadtxt('data/LA_od_2.csv', delimiter=',', skiprows=1)
@@ -349,7 +361,7 @@ def main():
         demand[:,2] = 0.5*demand[:,2] / 4000
         g_nr, small_capacity = multiply_cognitive_cost(graph, features, thres, cog_cost)
         d_nr, d_r = heterogeneous_demand(demand, alpha)
-        fs, hs, n_d = fw_heterogeneous_1([graph, g_nr], [d_r,d_nr], alpha, max_iter=5, display=1)
+        fs, hs, n_d = fw_heterogeneous_1([graph, g_nr], [d_r,d_nr], alpha, max_iter=30, display=1)
         print n_d
 
         output = {
@@ -359,11 +371,11 @@ def main():
         }
 
         with open('graph_stuff/LA_net_od_2_alpha_{}.txt'.format(alpha), 'w') as outfile:
-            outfile.write(json.dumps(output))
+            outfile.write(pickle.dumps(output))
 
         #end of timer
         elapsed2 = timeit.default_timer() - start_time2;
-        break
+        # break
         print ("Execution took %s seconds" % elapsed2)
     # visualize_LA()
 

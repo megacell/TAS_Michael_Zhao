@@ -143,22 +143,27 @@ function onEachFeature(feature, layer) {
 // }).addTo(map);
 
 
-// blue, yellow, orange, orange-red, red
-var colors = ['#00FFFF', '#FFFF00', '#FFA500', '#FF4500', '#FF0000']
+//               teal,    yellow,     orange, orange-red,    red,      black,     green,      blue,     purple
+var colors = ['#00FFFF', '#FFFF00', '#FFA500', '#FF4500', '#FF0000', '#000000', '#00FF00', '#0000FF', '#551A8B']
 // green, green-yellow, yellow, orange, red
 // var colors = ['#2CC200', '#8CD100', '#E0C700', '#EF6A00', '#FF0000'];
 
 
 function getColor(x) {
-  return x <= 1     ?    colors[0]:
-         x <= 2     ?   colors[1]:
-         x <= 3     ?   colors[2]:
-         x <= 4    ?   colors[3]:
-                          colors[4];
+  return x <= 0     ?    colors[5]:
+         x <= 1     ?    colors[0]:
+         x <= 2     ?    colors[1]:
+         x <= 3     ?    colors[2]:
+         x <= 4     ?    colors[3]:
+         x <= 5     ?    colors[4]:
+         x <= 6     ?    colors[6]:
+         x <= 7     ?    colors[7]:
+                         colors[8];
 };
 
 function getOpacity(x) {
-  return x <= 1     ?    1.0:
+  return x <= 0     ?    0.0:
+         x <= 1     ?    1.0:
          x <= 2     ?   1.0:
          x <= 3     ?   1.0:
          x <= 4    ?   1.0:
