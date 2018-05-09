@@ -331,28 +331,25 @@ import json
 import cPickle as pickle
 
 def main():
-    #braess_parametric_study()
-    #start timer
-    # for alpha in np.linspace(.05, .95, 10):
-    # for alpha in np.linspace(.05, .45, 5):
-    # for alpha in np.linspace(.55, .95, 5):
-    # print np.linspace(0, .49, 50)
-    # print np.linspace(0.00, 1.00, 21)
-    # exit(1)
-
+    for alpha in [.75]:
     # for alpha in np.linspace(0, .49, 50):
-    for alpha in np.linspace(.5, .99, 50):
-        if alpha in np.linspace(0.00, 1.00, 21):
-            continue
+    # for alpha in np.linspace(.5, .99, 50):
         print "ALPHA:", alpha
         start_time2 = timeit.default_timer()
+
         graph = np.loadtxt('data/LA_net.csv', delimiter=',', skiprows=1)
         demand = np.loadtxt('data/LA_od_2.csv', delimiter=',', skiprows=1)
         graph[10787,-1] = graph[10787,-1] / (1.5**4)
         graph[3348,-1] = graph[3348,-1] / (1.2**4)
         node = np.loadtxt('data/LA_node.csv', delimiter=',')
-        # features = table in the format [[capacity, length, FreeFlowTime]]
         features = extract_features('data/LA_net.txt')
+
+        # graph = np.loadtxt('data/Chicago_net.csv', delimiter=',', skiprows=1)
+        # demand = np.loadtxt('data/Chicago_od.csv', delimiter=',', skiprows=1)
+        # node = np.loadtxt('data/Chicago_node.csv', delimiter=',', skiprows=1)
+        # features = extract_features('data/ChicagoSketch_net.txt')
+
+        # features = table in the format [[capacity, length, FreeFlowTime]]
 
         # alpha = .2 # also known as r
         thres = 1000.
@@ -371,11 +368,12 @@ def main():
         }
 
         with open('graph_stuff/LA_net_od_2_alpha_{}.txt'.format(alpha), 'w') as outfile:
+        # with open('graph_stuff/Chicago_net_od_2_alpha_{}.txt'.format(alpha), 'w') as outfile:
             outfile.write(pickle.dumps(output))
 
         #end of timer
         elapsed2 = timeit.default_timer() - start_time2;
-        # break
+
         print ("Execution took %s seconds" % elapsed2)
     # visualize_LA()
 

@@ -455,8 +455,6 @@ def single_class_parametric_study(factors, output, net, demand, \
 
 
 def main():
-    #braess_parametric_study()
-    #start timer
     start_time2 = timeit.default_timer()
     graph = np.loadtxt('data/LA_net.csv', delimiter=',', skiprows=1)
     demand = np.loadtxt('data/LA_od_2.csv', delimiter=',', skiprows=1)
